@@ -1,11 +1,13 @@
 <?php
-class PagarMe_Checkout_Model_Total extends Mage_Sales_Model_Quote_Address_Total_Abstract
+
+class PagarMe_Core_Model_Quote_Address_Total_CreditCardInterestAmount
+ extends PagarMe_Core_Model_Quote_Address_Total_Abstract
 {
     private $interestAmount;
 
     public function __construct()
     {
-        $this->setCode('pagarme_checkout');
+        $this->setCode('pagarme_checkout_credit_card');
     }
 
     /**
@@ -15,7 +17,7 @@ class PagarMe_Checkout_Model_Total extends Mage_Sales_Model_Quote_Address_Total_
      */
     public function getLabel()
     {
-        return Mage::helper('pagarme_checkout')->__('Interest/Discount');
+        return Mage::helper('pagarme_checkout')->__('Interest fee');
     }
 
     /**
@@ -26,35 +28,20 @@ class PagarMe_Checkout_Model_Total extends Mage_Sales_Model_Quote_Address_Total_
     {
         parent::collect($address);
 
-        $paymentData = Mage::app()->getRequest()->getPost('payment');
-
-        if (is_null($paymentData)) {
+        if (!$this->shouldCollect()) {
             return $this;
         }
-
-        if ($this->interestAmount != 0) {
-            return $this;
-        }
-
-        $transaction = Mage::getModel(
-            'pagarme_core/sdk_adapter'
-            )->getPagarMeSdk()
-            ->transaction()
-            ->get($paymentData['pagarme_checkout_token']);
 
         $quote = $address->getQuote();
+        $subtotalAmount = $this->getSubtotal($quote);
 
-        $quoteTotals = $quote->getTotals();
-        $baseSubtotalWithDiscount = $quoteTotals['subtotal']->getValue();
+        $transaction = $this->getTransaction();
+        $totalAmount = Mage::helper('pagarme_core')
+            ->parseAmountToFloat($transaction->getAmount());
 
-        $shippingAmount = $quote->getShippingAddress()->getShippingAmount();
+        $this->interestAmount = $totalAmount - $subtotalAmount;
 
-        $subTotal = $baseSubtotalWithDiscount + $shippingAmount;
-
-        $totalAmount = $transaction->getAmount()/100;
-        $this->interestAmount = $totalAmount - $subTotal;
-
-        if ($this->interestAmount) {
+        if ($this->interestAmount > 0) {
             $this->_addAmount($this->interestAmount);
             $this->_addBaseAmount($this->interestAmount);
         }
@@ -63,9 +50,31 @@ class PagarMe_Checkout_Model_Total extends Mage_Sales_Model_Quote_Address_Total_
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public function shouldCollect()
+    {
+        if (!parent::shouldCollect()) {
+            return false;
+        }
+
+        $transaction = $this->getTransaction();
+
+        if (!$transaction instanceof \PagarMe\Sdk\Transaction\CreditCardTransaction) {
+            return false;
+        }
+
+        if ($this->interestAmount > 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Add giftcard totals information to address object
      *
-     * @param   Mage_Sales_Model_Quote_Address $address
+     * @param Mage_Sales_Model_Quote_Address $address
      */
     public function fetch(Mage_Sales_Model_Quote_Address $address)
     {
