@@ -70,3 +70,18 @@ Feature: Configuration Form
         And change the checkout button text
         And save configuration
         Then the configuration must be saved with success
+
+    @only
+    Scenario Outline: Cunfigure boleto discount
+        Given a admin user
+        When I access the admin
+        And go to system configuration page
+        And I set boleto discount to "<boleto_discount>"
+        And I set boleto discount mode to "<boleto_discount_mode>"
+        And save configuration
+        Then the configuration must be saved with success
+        Examples:
+        | boleto_discount | boleto_discount_mode  |
+        | 0               | No discount           |
+        | 10.5            | Fixed value           |
+        | 20.72           | Percentage            |
