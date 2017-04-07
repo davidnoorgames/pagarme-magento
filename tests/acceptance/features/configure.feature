@@ -71,7 +71,6 @@ Feature: Configuration Form
         And save configuration
         Then the configuration must be saved with success
 
-    @only
     Scenario Outline: Cunfigure boleto discount
         Given a admin user
         When I access the admin
